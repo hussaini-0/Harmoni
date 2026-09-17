@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera } from '@mediapipe/camera_utils';
-import { Hands, HAND_CONNECTIONS, type Results } from '@mediapipe/hands';
+import type { Camera } from '@mediapipe/camera_utils';
+import type { Hands, Results } from '@mediapipe/hands';
+import cameraScriptUrl from '@mediapipe/camera_utils/camera_utils.js?url';
+import handsScriptUrl from '@mediapipe/hands/hands.js?url';
 import { DRUM_ZONE_TOP, drumPadForPosition, drumPads, noteForPosition } from '../data/music';
 import type { InstrumentId, Landmark, ScaleId, TrackedHand } from '../types';
 
@@ -20,6 +22,35 @@ type HandMemory = {
   drumArmed: boolean;
   drumHitY: number;
 };
+
+type MediaPipeWindow = Window & {
+  Camera?: typeof import('@mediapipe/camera_utils').Camera;
+  Hands?: typeof import('@mediapipe/hands').Hands;
+  HAND_CONNECTIONS?: Array<[number, number]>;
+};
+
+let mediaPipeScripts: Promise<void> | null = null;
+
+function loadScript(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      script.remove();
+      reject(new Error('Unable to load hand tracking. Check your connection and try again.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function loadMediaPipe(): Promise<void> {
+  mediaPipeScripts ??= Promise.all([loadScript(handsScriptUrl), loadScript(cameraScriptUrl)]).then(() => undefined);
+  return mediaPipeScripts.catch((error) => {
+    mediaPipeScripts = null;
+    throw error;
+  });
+}
 
 export function useHandTracker({ instrument, scale, showLandmarks, onHands }: TrackerOptions) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -67,8 +98,11 @@ export function useHandTracker({ instrument, scale, showLandmarks, onHands }: Tr
     setLoading(true);
     setError(null);
     try {
-      const hands = new Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      await loadMediaPipe();
+      const { Hands: HandsConstructor, Camera: CameraConstructor } = window as MediaPipeWindow;
+      if (!HandsConstructor || !CameraConstructor) throw new Error('Hand tracking could not initialize.');
+      const hands = new HandsConstructor({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
       });
       hands.setOptions({
         maxNumHands: 2,
@@ -85,7 +119,7 @@ export function useHandTracker({ instrument, scale, showLandmarks, onHands }: Tr
 
       const video = videoRef.current;
       if (!video) throw new Error('Camera surface is not ready.');
-      const camera = new Camera(video, {
+      const camera = new CameraConstructor(video, {
         onFrame: async () => {
           if (video.readyState >= 2) await hands.send({ image: video });
         },
@@ -211,7 +245,7 @@ function drawHand(ctx: CanvasRenderingContext2D, hand: TrackedHand, width: numbe
   ctx.strokeStyle = hand.isPinching || hand.drumHit ? 'rgba(248,213,126,0.8)' : 'rgba(147,197,253,0.62)';
   ctx.lineWidth = 3;
   if (showLandmarks) {
-    HAND_CONNECTIONS.forEach(([a, b]) => {
+    ((window as MediaPipeWindow).HAND_CONNECTIONS ?? []).forEach(([a, b]) => {
       const start = hand.landmarks[a];
       const end = hand.landmarks[b];
       ctx.beginPath();
