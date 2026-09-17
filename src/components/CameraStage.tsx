@@ -29,7 +29,7 @@ export function CameraStage({ instrument, scale, showLandmarks, onHands, onStart
               {loading ? <Loader2 className="animate-spin text-sky-100" /> : <Camera className="text-sky-100" />}
             </div>
             <h2 className="text-2xl font-semibold text-white">Start your camera</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">Harmoni tracks both hands locally in your browser and turns pinches into musical notes.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">Harmoni tracks both hands locally in your browser. Pinch to play notes, or strike downward over a pad to play drums.</p>
             <button className="primary-button mt-5" type="button" onClick={handleStart} disabled={loading}>
               {loading ? 'Starting...' : 'Start Camera'}
             </button>

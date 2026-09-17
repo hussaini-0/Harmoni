@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera } from '@mediapipe/camera_utils';
 import { Hands, HAND_CONNECTIONS, type Results } from '@mediapipe/hands';
-import { drumPadForPosition, noteForPosition } from '../data/music';
+import { DRUM_ZONE_TOP, drumPadForPosition, drumPads, noteForPosition } from '../data/music';
 import type { InstrumentId, Landmark, ScaleId, TrackedHand } from '../types';
 
 type TrackerOptions = {
@@ -16,6 +16,9 @@ type HandMemory = {
   x: number;
   y: number;
   velocity: number;
+  time: number;
+  drumArmed: boolean;
+  drumHitY: number;
 };
 
 export function useHandTracker({ instrument, scale, showLandmarks, onHands }: TrackerOptions) {
@@ -28,14 +31,19 @@ export function useHandTracker({ instrument, scale, showLandmarks, onHands }: Tr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    memoryRef.current.clear();
+  }, [instrument]);
+
   const draw = useCallback((results: Results, trackedHands: TrackedHand[]) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const bounds = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(bounds.width * window.devicePixelRatio));
+    canvas.height = Math.max(1, Math.round(bounds.height * window.devicePixelRatio));
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(-1, 1);
@@ -112,7 +120,7 @@ function normalizeResults(
 ): TrackedHand[] {
   const now = performance.now();
   const multiLandmarks = results.multiHandLandmarks ?? [];
-  return multiLandmarks.map((landmarks, index) => {
+  const tracked: TrackedHand[] = multiLandmarks.map((landmarks, index) => {
     const handedness = results.multiHandedness?.[index]?.label === 'Left' ? 'Left' : 'Right';
     const id = handedness;
     const normalized = landmarks as Landmark[];
@@ -127,27 +135,42 @@ function normalizeResults(
     const wasPinching = previous?.pinching ?? false;
     const isPinching = wasPinching ? distance < 0.083 : distance < 0.065;
     const velocity = previous ? Math.hypot(x - previous.x, y - previous.y) * 12 + previous.velocity * 0.45 : 0;
+    const elapsed = previous ? (now - previous.time) / 1000 : 0;
+    const verticalSpeed = previous && elapsed > 0.008 && elapsed < 0.15 ? (y - previous.y) / elapsed : 0;
+    const drumArmed = !previous || previous.drumArmed || y < DRUM_ZONE_TOP || y < previous.drumHitY - 0.045;
+    const drumHit = instrument === 'drum-kit' && !!previous && drumArmed && y >= DRUM_ZONE_TOP && verticalSpeed > 0.42;
     const musical = instrument === 'drum-kit' ? drumPadForPosition(x, y).name : noteForPosition(x, y, scale).note;
     const octave = instrument === 'drum-kit' ? 0 : Number.parseInt(musical.charAt(musical.length - 1) || '4', 10);
-    memory.set(id, { pinching: isPinching, x, y, velocity });
+    memory.set(id, {
+      pinching: isPinching, x, y, velocity: drumHit ? Math.min(1, verticalSpeed / 1.8) : velocity,
+      time: now,
+      drumArmed: drumHit ? false : drumArmed,
+      drumHitY: drumHit ? y : previous?.drumHitY ?? y,
+    });
     return {
       id,
       handedness,
       landmarks: normalized,
       pinchStrength: strength,
       isPinching,
+      drumHit,
       note: musical,
       octave,
-      velocity,
+      velocity: drumHit ? Math.min(1, verticalSpeed / 1.8) : velocity,
       x,
       y,
       lastSeen: now,
     };
   });
+  const visible = new Set(tracked.map((hand) => hand.id));
+  [...memory.keys()].forEach((id) => {
+    if (!visible.has(id)) memory.delete(id);
+  });
+  return tracked;
 }
 
 function drawPlayableZone(ctx: CanvasRenderingContext2D, width: number, height: number, instrument: InstrumentId) {
-  const top = height * 0.47;
+  const top = height * DRUM_ZONE_TOP;
   ctx.save();
   ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
   ctx.fillRect(0, top, width, height - top);
@@ -167,13 +190,25 @@ function drawPlayableZone(ctx: CanvasRenderingContext2D, width: number, height: 
     ctx.lineTo(width, top + ((height - top) / rows) * i);
     ctx.stroke();
   }
+  if (instrument === 'drum-kit') {
+    ctx.textAlign = 'center';
+    ctx.font = '600 16px Inter, system-ui, sans-serif';
+    drumPads.forEach((pad, index) => {
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      const cellWidth = width / 3;
+      const cellHeight = (height - top) / 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.74)';
+      ctx.fillText(pad.name, col * cellWidth + cellWidth / 2, top + row * cellHeight + cellHeight / 2);
+    });
+  }
   ctx.restore();
 }
 
 function drawHand(ctx: CanvasRenderingContext2D, hand: TrackedHand, width: number, height: number, showLandmarks: boolean) {
   ctx.save();
-  ctx.fillStyle = hand.isPinching ? '#f8d57e' : '#93c5fd';
-  ctx.strokeStyle = hand.isPinching ? 'rgba(248,213,126,0.8)' : 'rgba(147,197,253,0.62)';
+  ctx.fillStyle = hand.isPinching || hand.drumHit ? '#f8d57e' : '#93c5fd';
+  ctx.strokeStyle = hand.isPinching || hand.drumHit ? 'rgba(248,213,126,0.8)' : 'rgba(147,197,253,0.62)';
   ctx.lineWidth = 3;
   if (showLandmarks) {
     HAND_CONNECTIONS.forEach(([a, b]) => {
@@ -193,6 +228,13 @@ function drawHand(ctx: CanvasRenderingContext2D, hand: TrackedHand, width: numbe
   }
   const labelX = hand.x * width;
   const labelY = Math.max(32, hand.y * height - 34);
+  if (hand.drumHit) {
+    ctx.beginPath();
+    ctx.arc(labelX, hand.y * height, 28, 0, Math.PI * 2);
+    ctx.strokeStyle = '#f8d57e';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+  }
   ctx.fillStyle = 'rgba(2, 6, 23, 0.72)';
   ctx.strokeStyle = 'rgba(255,255,255,0.18)';
   roundedRect(ctx, labelX - 34, labelY - 18, 68, 30, 10);

@@ -42,6 +42,8 @@ export const drumPads = [
   { name: 'Cymbal', key: 'C#3' },
 ];
 
+export const DRUM_ZONE_TOP = 0.47;
+
 export function noteForPosition(x: number, y: number, scaleId: ScaleId): { note: string; octave: number } {
   const scale = scales[scaleId];
   const playableX = Math.min(0.98, Math.max(0.02, x));
@@ -55,6 +57,6 @@ export function noteForPosition(x: number, y: number, scaleId: ScaleId): { note:
 
 export function drumPadForPosition(x: number, y: number) {
   const col = Math.min(2, Math.max(0, Math.floor(x * 3)));
-  const row = y < 0.58 ? 0 : 1;
+  const row = y < (1 + DRUM_ZONE_TOP) / 2 ? 0 : 1;
   return drumPads[row * 3 + col];
 }

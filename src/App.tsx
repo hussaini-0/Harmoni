@@ -45,8 +45,8 @@ export default function App() {
   };
 
   const handSummary = useMemo(
-    () => hands.map((hand) => `${hand.handedness}: ${hand.note}${hand.isPinching ? ' playing' : ''}`).join('  /  '),
-    [hands],
+    () => hands.map((hand) => `${hand.handedness}: ${hand.note}${settings.selectedInstrument === 'drum-kit' ? (hand.drumHit ? ' hit' : '') : (hand.isPinching ? ' playing' : '')}`).join('  /  '),
+    [hands, settings.selectedInstrument],
   );
 
   return (

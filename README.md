@@ -23,4 +23,4 @@ npm run build
 - Pinch thumb and index finger together over the lower camera area to play notes.
 - Move left to right for lower to higher notes, and lower to higher vertically for register changes.
 - Turn on Orchestra Mode to add harmony layers that follow the lead notes.
-- Use Drum Kit for a pad grid with kick, snare, hi-hat, clap, tom, and cymbal gestures.
+- For Drum Kit, move either hand over a labeled pad in the lower camera area and strike downward, then lift to reset for the next hit. No pinch is needed.

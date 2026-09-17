@@ -65,7 +65,7 @@ export class MusicEngine {
       if (!hand.note) return;
       seen.add(hand.id);
       if (settings.selectedInstrument === 'drum-kit') {
-        if (hand.isPinching || hand.velocity > 0.42) {
+        if (hand.drumHit) {
           this.triggerDrum(hand);
         }
         return;
@@ -138,7 +138,7 @@ export class MusicEngine {
   private triggerDrum(hand: TrackedHand) {
     const now = Tone.now();
     const previous = this.lastDrumHit.get(hand.id) ?? 0;
-    if (now - previous < 0.16) return;
+    if (now - previous < 0.11) return;
     const pad = drumPadForPosition(hand.x, hand.y);
     const velocity = Math.min(1, Math.max(0.35, 0.45 + hand.velocity));
     if (pad.name === 'Kick') this.kick.triggerAttackRelease('C1', '8n', now, velocity);

@@ -28,6 +28,7 @@ export function OnboardingModal({ open, onClose }: Props) {
             <Music className="mt-1 shrink-0 text-amber-200" size={20} />
             <p>Pinch thumb and index finger to play. Left-to-right chooses notes; vertical movement changes register. Both hands play the selected instrument together.</p>
           </div>
+          <p className="text-slate-300">For Drum Kit, move either hand over a labeled pad and strike downward, then lift before the next hit. No pinch is needed.</p>
           <p className="text-slate-300">Switch scales, enable sustain, or turn on Orchestra Mode to conduct harmony layers that follow your lead notes.</p>
         </div>
         <button className="primary-button mt-6 w-full" type="button" onClick={onClose}>

@@ -32,6 +32,7 @@ export type TrackedHand = {
   landmarks: Landmark[];
   pinchStrength: number;
   isPinching: boolean;
+  drumHit: boolean;
   note: string | null;
   octave: number;
   velocity: number;
