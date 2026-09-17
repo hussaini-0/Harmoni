@@ -20,7 +20,7 @@ npm run build
 ## Controls
 
 - Select an instrument, scale, sustain mode, and master volume.
-- Pinch thumb and index finger together over the lower camera area to play notes.
-- Move left to right for lower to higher notes, and lower to higher vertically for register changes.
+- Pinch thumb and index finger together over a labeled note box to play its note.
+- Move left to right for lower to higher notes, and move upward for a higher register.
 - Turn on Orchestra Mode to add harmony layers that follow the lead notes.
 - For Drum Kit, move either hand over a labeled pad in the lower camera area and strike downward, then lift to reset for the next hit. No pinch is needed.

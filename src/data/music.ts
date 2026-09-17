@@ -43,16 +43,23 @@ export const drumPads = [
 ];
 
 export const DRUM_ZONE_TOP = 0.47;
+export const MELODIC_COLUMNS = 8;
+export const MELODIC_ROWS = 3;
+
+const naturalSemitones: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+function pitchClass(note: string): number {
+  return naturalSemitones[note.charAt(0)] + (note.includes('#') ? 1 : note.includes('b') ? -1 : 0);
+}
 
 export function noteForPosition(x: number, y: number, scaleId: ScaleId): { note: string; octave: number } {
   const scale = scales[scaleId];
-  const playableX = Math.min(0.98, Math.max(0.02, x));
-  const noteIndex = Math.floor(playableX * scale.notes.length * 2.2);
-  const degree = noteIndex % scale.notes.length;
-  const horizontalOctave = Math.floor(noteIndex / scale.notes.length);
-  const verticalOctave = y < 0.35 ? 2 : y < 0.62 ? 1 : 0;
-  const octave = Math.min(6, Math.max(2, 2 + horizontalOctave + verticalOctave));
-  return { note: `${scale.notes[degree]}${octave}`, octave };
+  const column = Math.min(MELODIC_COLUMNS - 1, Math.max(0, Math.floor(x * MELODIC_COLUMNS)));
+  const row = Math.min(MELODIC_ROWS - 1, Math.max(0, Math.floor(y * MELODIC_ROWS)));
+  const noteName = scale.notes[column % scale.notes.length];
+  const octave = 4 - row + Math.floor(column / scale.notes.length)
+    + (pitchClass(noteName) < pitchClass(scale.root) ? 1 : 0);
+  return { note: `${noteName}${octave}`, octave };
 }
 
 export function drumPadForPosition(x: number, y: number) {

@@ -3,7 +3,7 @@ import type { Camera } from '@mediapipe/camera_utils';
 import type { Hands, Results } from '@mediapipe/hands';
 import cameraScriptUrl from '@mediapipe/camera_utils/camera_utils.js?url';
 import handsScriptUrl from '@mediapipe/hands/hands.js?url';
-import { DRUM_ZONE_TOP, drumPadForPosition, drumPads, noteForPosition } from '../data/music';
+import { DRUM_ZONE_TOP, MELODIC_COLUMNS, MELODIC_ROWS, drumPadForPosition, drumPads, noteForPosition } from '../data/music';
 import type { InstrumentId, Landmark, ScaleId, TrackedHand } from '../types';
 
 type TrackerOptions = {
@@ -80,9 +80,9 @@ export function useHandTracker({ instrument, scale, showLandmarks, onHands }: Tr
     ctx.scale(-1, 1);
     ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
     ctx.restore();
-    drawPlayableZone(ctx, canvas.width, canvas.height, instrument);
+    drawPlayableZone(ctx, canvas.width, canvas.height, instrument, scale);
     trackedHands.forEach((hand) => drawHand(ctx, hand, canvas.width, canvas.height, showLandmarks));
-  }, [instrument, showLandmarks]);
+  }, [instrument, scale, showLandmarks]);
 
   useEffect(() => {
     const hands = handsRef.current;
@@ -203,15 +203,15 @@ function normalizeResults(
   return tracked;
 }
 
-function drawPlayableZone(ctx: CanvasRenderingContext2D, width: number, height: number, instrument: InstrumentId) {
-  const top = height * DRUM_ZONE_TOP;
+function drawPlayableZone(ctx: CanvasRenderingContext2D, width: number, height: number, instrument: InstrumentId, scale: ScaleId) {
+  const top = instrument === 'drum-kit' ? height * DRUM_ZONE_TOP : 0;
   ctx.save();
   ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
   ctx.fillRect(0, top, width, height - top);
   ctx.strokeStyle = 'rgba(255,255,255,0.12)';
   ctx.lineWidth = 1;
-  const columns = instrument === 'drum-kit' ? 3 : 8;
-  const rows = instrument === 'drum-kit' ? 2 : 3;
+  const columns = instrument === 'drum-kit' ? 3 : MELODIC_COLUMNS;
+  const rows = instrument === 'drum-kit' ? 2 : MELODIC_ROWS;
   for (let i = 1; i < columns; i += 1) {
     ctx.beginPath();
     ctx.moveTo((width / columns) * i, top);
@@ -235,6 +235,25 @@ function drawPlayableZone(ctx: CanvasRenderingContext2D, width: number, height: 
       ctx.fillStyle = 'rgba(255,255,255,0.74)';
       ctx.fillText(pad.name, col * cellWidth + cellWidth / 2, top + row * cellHeight + cellHeight / 2);
     });
+  } else {
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
+    const fontSize = Math.min(18, Math.max(12, cellWidth * 0.19));
+    ctx.textAlign = 'center';
+    ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < columns; col += 1) {
+        const note = noteForPosition((col + 0.5) / columns, (row + 0.5) / rows, scale).note;
+        const centerX = (col + 0.5) * cellWidth;
+        const labelY = (row + 1) * cellHeight - Math.max(12, fontSize);
+        const labelWidth = Math.min(cellWidth - 6, ctx.measureText(note).width + 14);
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.62)';
+        roundedRect(ctx, centerX - labelWidth / 2, labelY - fontSize, labelWidth, fontSize + 9, 5);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillText(note, centerX, labelY);
+      }
+    }
   }
   ctx.restore();
 }
